@@ -1,6 +1,15 @@
-import sys,csv,pathlib,json
+import sys,csv,pathlib,json,os
 
 args = sys.argv
+
+DATA_PATH = "."
+
+try:
+    DATA_PATH = sys._MEIPASS
+except:pass
+
+def p(x:str):
+    return os.path.join(DATA_PATH,x)
 
 if "--help" in args or "-h" in args:
     print(
@@ -45,7 +54,7 @@ for x in args:
     break
 
 MAPS = {}
-for map in pathlib.Path(MAP_DIR if MAP_DIR else "./maps").iterdir():
+for map in pathlib.Path(MAP_DIR if MAP_DIR else p("maps")).iterdir():
     MAPS[map.name[:-4]] = {}
 
 map = None
@@ -101,7 +110,7 @@ if not map:
     print()
 
 firstFlag = True
-with open(f"./maps/{map}.csv") as f:
+with open(p(f"maps/{map}.csv")) as f:
     reader = csv.DictReader(f)
     for row in reader:
         data = {}
@@ -159,18 +168,18 @@ def run(firstRun:bool=False):
     out_data = []
     if suspects:
         message = "Potential suspects:\n"
-        for x in suspects:
-            message+=f"- {x}\n"
+        for i, x in enumerate(suspects):
+            message+=f"- {x} ({i})\n"
             if OUTPUT_PATH:
                 out_data.append(x)
         if not OUTPUT_PATH: print(message)
     else:
-        if not OUTPUT_PATH: print("No suspects found; you screwed up!\n")
+        if not OUTPUT_PATH: print("No suspects found; you messed up!\n")
     if OUTPUT_PATH:
         with open(OUTPUT_PATH,"w") as f:
             json.dump(out_data,f)
     if not NO_INTERACT:
-        again = input("Run again? (Y/n)")
+        again = input("Run again? (Y/n): ")
         if not again or again.lower() == "y" or again.lower() == "yes":
             run()
 
