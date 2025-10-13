@@ -55,6 +55,7 @@ for x in args:
 
 MAPS = {}
 for map in pathlib.Path(MAP_DIR if MAP_DIR else p("maps")).iterdir():
+    if not map.name.endswith(".csv"): continue
     MAPS[map.name[:-4]] = {}
 
 map = None
