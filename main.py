@@ -169,8 +169,9 @@ def run(firstRun:bool=False):
     out_data = []
     if suspects:
         message = "Potential suspects:\n"
+        keys = list(MAPS[map].keys())
         for x in suspects:
-            message+=f"- (#{list(MAPS[map].keys()).index(x)+1}) {x}\n"
+            message+=f"- (#{keys.index(x)+1}/{len(keys)}) {x}\n"
             if OUTPUT_PATH:
                 out_data.append(x)
         if not OUTPUT_PATH: print(message)
