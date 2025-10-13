@@ -49,8 +49,8 @@ for map in pathlib.Path(MAP_DIR if MAP_DIR else "./maps").iterdir():
     MAPS[map.name[:-4]] = {}
 
 map = None
-evidence = []
 clues = []
+evidence = []
 suspects = []
 
 for x in args:
@@ -128,6 +128,8 @@ if MODE == "clue":
 
 def run(firstRun:bool=False):
     global map,evidence,clues,suspects
+    suspects.clear()
+    if not firstRun: evidence.clear()
     if not NO_INTERACT and (not firstRun or not evidence):
         i = 1
         message = "Clue Names:\n"
