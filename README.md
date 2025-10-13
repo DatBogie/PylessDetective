@@ -37,7 +37,7 @@ PylessDetective -h
 3. Setup venv:
 
     ```sh
-    python3 -m venv .venv && pip3 install -r requirements.txt
+    python3 -m venv .venv && source ./.venv/bin/activate && pip3 install -r requirements.txt
     ```
 
 4. Run build script (run `build.bat` on Windows):
@@ -54,15 +54,20 @@ This may need to be done if I ever get tired of this game, so I will describe th
 
 ### Map Structure (Reference)
 
+Map files should have unique names.
+
 ```fs
 maps/
 ├── map1.csv
 ├── map2.csv
 └── map3.csv
+└── ...
 ```
 
 ### Map-packs
 
 If you'd like to make map-packs (external folders containing levels), you're in the right place!
 
-
+1. Create a folder. Name it anything you'd like.
+2. In that folder, create a file. Make sure it ends in `.csv`.
+3. 
