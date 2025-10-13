@@ -52,8 +52,11 @@ PylessDetective -h
 
 This may need to be done if I ever get tired of this game, so I will describe the process here.
 
-### Map Structure (Reference)
+### Reference
 
+#### Directory Structure
+
+> [!Important]
 Map files should have unique names.
 
 ```fs
@@ -64,10 +67,61 @@ maps/
 └── ...
 ```
 
+#### File Format
+
+A `1` represents that the suspect exhibits that clue. Nothing after a comma (eg. `,<- here`) represents them not exhibiting that clue.
+
+Example level:
+
+```csv
+Name,clue1,clue2,clue3
+Guy,1,,1
+Person,1,1,
+Individual,,1,1
+```
+
+Above, Guy exhbits `clue1` & `clue3`, but not `clue2`.
+
 ### Map-packs
 
 If you'd like to make map-packs (external folders containing levels), you're in the right place!
 
 1. Create a folder. Name it anything you'd like.
 2. In that folder, create a file. Make sure it ends in `.csv`.
-3. 
+3. Open that file, henceforth referred to as "the level file," in a text editor.
+4. Paste in:
+
+    ```csv
+    Name,
+    ```
+
+5. After the comma, type a shorted name of each clue, separated by commas. Eg.:
+
+    ```csv
+    Name,clue1,clue2,clue3
+    ```
+
+6. Now, go to the next line and type in the first suspect's name (make sure to write them in order of appearance in the File/ending lineup).
+
+    Follow that up with a comma, and then put a "1" for all of their characteristic clues. Leave the rest blank. Eg.:
+
+    ```csv
+    Name,clue1,clue2,clue3
+    Guy,1,,1
+    ```
+
+    In that example, "Guy" exhibits "clue1" and "clue3", but not "clue2".
+
+    An easy way to speed this process up is to copy/paste however many commas there are in a row. Eg. for the example above:
+
+    ```csv
+    ,,,
+    ```
+
+7. Save the file. Now you're done!
+
+    To use your map-pack in the program, find the absolute path to the map-pack folder (eg. `C:\Users\Default\Downloads\map-pack`) and paste it in the following command (use `PylessDetective.exe` on Windows):
+
+    ```sh
+    PylessDetective -d=<abs_path_to_map-pack>
+    ```
