@@ -1,0 +1,1 @@
+pyinstaller -yF -n "PylessDetective" --add-data "maps/*.csv:maps/" main.py

@@ -1,4 +1,4 @@
-import sys,csv,pathlib
+import sys,csv,pathlib,json
 
 MAPS = {}
 
@@ -12,31 +12,66 @@ suspects = []
 
 args = sys.argv
 
-if "--help" in args:
+if "--help" in args or "-h" in args:
     print(
 """
 PylessDetective Help:
 \tVariables:
-\t\t--help | Show this message.
-\t\t--map=<map_name> | Specify a map.
-\t\t--clue=<clue_name> | Specify a clue. [Repeatable]
+\t\t--help, -h | Show this message.
+\t\t--map, -m=<map_name> | Specify a map.
+\t\t--clue, -c=<clue_name> | Specify a clue. [Repeatable]
+\t\t--non-interactive, -y | Skip all input() calls.
+\t\t--output, -o=<output_path> | Specify output file path/name (JSON formatted). No output file if not specified.
+\t\t\t> eg.: `--output=result.json` => `./result.json`
+\t\t--simple-print, -s | Prints in a basic headerless CSV format.
+\t\t--mode, -f= | Program mode/function. ["suspect","clue","map"]
+\t\t\t> suspect | Finds suspects and prints/outputs them.
+\t\t\t> clue | Finds all clues of the given map and prints/outputs them.
+\t\t\t> map | Finds all map names and prints/outputs them.
 
 \tInformation:
 \t\t[Repeatable] | This variable can be specified multiple times.
-\t\t\t> eg.: `PylessDetective --clue=tooth --clue=forgotten shoe`
+\t\t\t> eg.: `--clue=tooth --clue=forgotten shoe`
 """
     )
     sys.exit(0)
 
+NO_INTERACT = "--non-interactive" in args or "-y" in args
+OUTPUT_PATH = None
+SIMPLE_PRINT = "--simple-print" in args or "-s" in args
+MODE = None
+
 for x in args:
-    if x.startswith("--map=") and not map:
-        name = x[6:].lower()
-        print(name)
+    if not map and x.startswith("--map=") or x.startswith("-m="):
+        name = x[6 if x.startswith("--map=") else 3:].lower()
         if MAPS.get(name) != None:
             map = name
             continue
-    if x.startswith("--clue="):
-        evidence.append(x[7:].lower())
+    if x.startswith("--clue=") or x.startswith("-c="):
+        evidence.append(x[7 if x.startswith("--clue=") else 3:].lower())
+        continue
+    if not OUTPUT_PATH and x.startswith("--output=") or x.startswith("-o="):
+        OUTPUT_PATH = x[9 if x.startswith("--output=") else 3:]
+        continue
+    if not MODE and x.startswith("--mode=") or x.startswith("-f="):
+        MODE = x[7 if x.startswith("--mode=") else 3:].lower()
+        continue
+
+if not MODE: MODE = "suspect"
+
+if MODE == "map":
+    out_data = []
+    message = "" if SIMPLE_PRINT else "Map Names:\n"
+    for x in MAPS.keys():
+        out_data.append(x)
+        message+=f"{x}," if SIMPLE_PRINT else f"- {x}\n"
+    if SIMPLE_PRINT and message.endswith(","): message = message[:-1]
+    if not OUTPUT_PATH:
+        print(message)
+    else:
+        with open(OUTPUT_PATH,"w") as f:
+            json.dump(out_data,f)
+    sys.exit(0)
 
 if not map:
     name = ""
@@ -65,9 +100,23 @@ with open(f"./maps/{map}.csv") as f:
         MAPS[map][row["Name"]] = data
         if firstFlag: firstFlag = False
 
+if MODE == "clue":
+    out_data = []
+    message = "" if SIMPLE_PRINT else "Clue Names:\n"
+    for x in clues:
+        out_data.append(x)
+        message+=f"{x}," if SIMPLE_PRINT else f"- {x}\n"
+    if SIMPLE_PRINT and message.endswith(","): message = message[:-1]
+    if not OUTPUT_PATH:
+        print(message)
+    else:
+        with open(OUTPUT_PATH,"w") as f:
+            json.dump(out_data,f)
+    sys.exit(0)
+
 def run(firstRun:bool=False):
     global map,evidence,clues,suspects
-    if not firstRun or not evidence:
+    if not NO_INTERACT and (not firstRun or not evidence):
         i = 1
         message = "Clue Names:\n"
         for x in clues:
@@ -93,16 +142,23 @@ def run(firstRun:bool=False):
         if not_it: continue
         suspects.append(name)
 
+    out_data = []
     if suspects:
         message = "Potential suspects:\n"
         for x in suspects:
             message+=f"- {x}\n"
-        print(message)
+            if OUTPUT_PATH:
+                out_data.append(x)
+        if not OUTPUT_PATH: print(message)
     else:
-        print("No suspects found; you screwed up!\n")
-    again = input("Run again? (Y/n)")
-    if not again or again.lower() == "y" or again.lower() == "yes":
-        run()
+        if not OUTPUT_PATH: print("No suspects found; you screwed up!\n")
+    if OUTPUT_PATH:
+        with open(OUTPUT_PATH,"w") as f:
+            json.dump(out_data,f)
+    if not NO_INTERACT:
+        again = input("Run again? (Y/n)")
+        if not again or again.lower() == "y" or again.lower() == "yes":
+            run()
 
 if __name__ == "__main__":
     run(True)
