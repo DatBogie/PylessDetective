@@ -168,8 +168,8 @@ def run(firstRun:bool=False):
     out_data = []
     if suspects:
         message = "Potential suspects:\n"
-        for i, x in enumerate(suspects):
-            message+=f"- {x} ({i})\n"
+        for x in suspects:
+            message+=f"- (#{list(MAPS[map].keys()).index(x)+1}) {x}\n"
             if OUTPUT_PATH:
                 out_data.append(x)
         if not OUTPUT_PATH: print(message)
