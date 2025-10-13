@@ -1,15 +1,5 @@
 import sys,csv,pathlib,json
 
-MAPS = {}
-
-for map in pathlib.Path("./maps").iterdir():
-    MAPS[map.name[:-4]] = {}
-
-map = None
-evidence = []
-clues = []
-suspects = []
-
 args = sys.argv
 
 if "--help" in args or "-h" in args:
@@ -24,10 +14,16 @@ PylessDetective Help:
 \t\t--output, -o=<output_path> | Specify output file path/name (JSON formatted). No output file if not specified.
 \t\t\t> eg.: `--output=result.json` => `./result.json`
 \t\t--simple-print, -s | Prints in a basic headerless CSV format.
-\t\t--mode, -f= | Program mode/function. ["suspect","clue","map"]
+\t\t--mode, -f=<mode> | Program mode/function. ["suspect","clue","map"]
 \t\t\t> suspect | Finds suspects and prints/outputs them.
 \t\t\t> clue | Finds all clues of the given map and prints/outputs them.
 \t\t\t> map | Finds all map names and prints/outputs them.
+\t\t--maps-dir, -d=<map_dir> | Specify a custom map directory.
+\t\t\t> Sample directory tree:
+\t\t\t\tmaps/
+\t\t\t\t├── map1.csv
+\t\t\t\t├── map2.csv
+\t\t\t\t└── map3.csv
 
 \tInformation:
 \t\t[Repeatable] | This variable can be specified multiple times.
@@ -40,6 +36,22 @@ NO_INTERACT = "--non-interactive" in args or "-y" in args
 OUTPUT_PATH = None
 SIMPLE_PRINT = "--simple-print" in args or "-s" in args
 MODE = None
+
+MAP_DIR = None
+for x in args:
+    if not x.startswith("--maps-dir=") and not x.startswith("-d="):
+        continue
+    MAP_DIR = x[11 if x.startswith("--maps-dir=") else 3:]
+    break
+
+MAPS = {}
+for map in pathlib.Path(MAP_DIR if MAP_DIR else "./maps").iterdir():
+    MAPS[map.name[:-4]] = {}
+
+map = None
+evidence = []
+clues = []
+suspects = []
 
 for x in args:
     if not map and x.startswith("--map=") or x.startswith("-m="):
