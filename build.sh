@@ -1,2 +1,2 @@
 #!/bin/bash
-pyinstaller -yF -n "PylessDetective" --add-data "maps/*.csv:maps/" main.py
+pyinstaller -ycF -n "PylessDetective" --add-data "maps/*.csv:maps/" main.py
