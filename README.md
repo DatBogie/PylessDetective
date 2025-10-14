@@ -7,6 +7,10 @@ Made for the Roblox game [Armless Detective](https://www.roblox.com/games/977196
 
 ## Usage
 
+Run the program and follow the prompts to use!
+
+See flag/parameter information (useful for 3rd-party apps?):
+
 ### Windows
 
 ```cmd
@@ -125,3 +129,4 @@ If you'd like to make map-packs (external folders containing levels), you're in 
     ```sh
     PylessDetective -d=<abs_path_to_map-pack>
     ```
+
