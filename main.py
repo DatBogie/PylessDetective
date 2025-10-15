@@ -48,6 +48,9 @@ OUTPUT_PATH = None
 SIMPLE_PRINT = "--simple-print" in args or "-s" in args
 MODE = None
 
+def get_path(x:str):
+    return os.path.expandvars(os.path.expanduser(x))
+
 MAP_DIR = None
 for x in args:
     if not x.startswith("--maps-dir=") and not x.startswith("-d="):
@@ -93,7 +96,7 @@ if MODE == "map":
     if not OUTPUT_PATH:
         print(message)
     else:
-        with open(OUTPUT_PATH,"w") as f:
+        with open(get_path(OUTPUT_PATH)"w") as f:
             json.dump(out_data,f)
     sys.exit(0)
 
@@ -134,7 +137,7 @@ if MODE == "clue":
     if not OUTPUT_PATH:
         print(message)
     else:
-        with open(OUTPUT_PATH,"w") as f:
+        with open(get_path(OUTPUT_PATH)"w") as f:
             json.dump(out_data,f)
     sys.exit(0)
 
@@ -180,7 +183,7 @@ def run(firstRun:bool=False):
     else:
         if not OUTPUT_PATH: print("No suspects found; you messed up!\n")
     if OUTPUT_PATH:
-        with open(OUTPUT_PATH,"w") as f:
+        with open(get_path(OUTPUT_PATH)"w") as f:
             json.dump(out_data,f)
     if not NO_INTERACT:
         again = input("Run again? (Y/n): ")
