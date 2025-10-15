@@ -1,5 +1,7 @@
 import sys,csv,pathlib,json,os
 
+VERSION = "v0.1"
+
 args = sys.argv
 
 DATA_PATH = "."
@@ -13,8 +15,8 @@ def p(x:str):
 
 if "--help" in args or "-h" in args:
     print(
-"""
-PylessDetective Help:
+f"""
+PylessDetective {VERSION} Help:
 \tVariables:
 \t\t--help, -h | Show this message.
 \t\t--map, -m=<map_name> | Specify a map.
