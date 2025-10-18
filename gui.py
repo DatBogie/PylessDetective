@@ -1,18 +1,39 @@
-import sys
+import os, sys, json
 from PySide6.QtWidgets import QApplication, QMainWindow, QSlider, QCheckBox, QComboBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QSplitter, QListWidget, QAbstractItemView, QListWidgetItem
-from PySide6.QtCore import Qt, Slot
-from main import get_maps, get_clues, get_suspects, get_map_data, prettify_map_name, uglify_map_name, gen_map_data
+from PySide6.QtCore import Qt, Slot, QStandardPaths
+from main import get_maps, get_clues, get_suspects, get_map_data, prettify_map_name, uglify_map_name, gen_map_data, TAB
 
 MAPS = get_maps()
 
 class UpdateType: Map=0; Clue=1
 
+CONF_DIR = os.path.join(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppConfigLocation).replace("/",os.path.sep),"PylessDetective")
+
+FOUND_SETTINGS = {}
+if not os.path.exists(CONF_DIR):
+    try:
+        os.mkdir(CONF_DIR)
+    except Exception as e:
+        print(e)
+try:
+    with open(os.path.join(CONF_DIR,"config.json"),"r") as f:
+        FOUND_SETTINGS = json.load(f)
+except Exception as e:
+    print(e)
+
 class MainWindow(QMainWindow):
+    global FOUND_SETTINGS
     def __init__(self):
         super().__init__()
         self.setWindowTitle("PylessDetective GUI")
         self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint)
+        if FOUND_SETTINGS.get("window_frameless"):
+            self.setWindowFlag(Qt.WindowType.FramelessWindowHint,True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+        if FOUND_SETTINGS.get("window_geometry"):
+            print(CONF_DIR)
+            self.setGeometry(*FOUND_SETTINGS["window_geometry"])
 
         self.cwidget = QSplitter(Qt.Orientation.Horizontal)
         self.cwidget.setHandleWidth(8)
@@ -41,19 +62,27 @@ class MainWindow(QMainWindow):
         self.toplayout.addWidget(self.mapSwitcher)
 
         self.suspects = QListWidget()
+        self.suspects.setToolTip("Potential suspects based on map and found/not present evidence\n#XX is the their number in the post-level lineup (out of /XX total people)")
         self.suspects.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.crlayout.addWidget(self.suspects)
 
         self.clues = CheckList()
+        self.clues.setToolTip(f"Clue:\n{TAB}Left Click: Toggle mark as found/to-be-found\n{TAB}Right Click: Toggle mark as not present\nBackground:\n{TAB}Right Click: Clear selection")
         self.clues.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.clues.itemSelectionChanged.connect(self.onCheckItemSelected)
         self.clues.itemChanged.connect(self.onCheckItemChanged)
         self.cwlayout.addWidget(self.clues)
 
         self.deco = QCheckBox("Frameless Window")
+        self.deco.setToolTip("Toggle hiding window title/borders")
         self.deco.setCheckState(Qt.CheckState.Unchecked)
         self.deco.checkStateChanged.connect(self.setFrameless)
         self.cwlayout.addWidget(self.deco)
+        
+        self.save = QCheckBox("Save Window Info")
+        self.save.setToolTip("Save window position, opacity, and titlebar/border visibility\nWhen closed while toggle off, settings will be wiped")
+        self.save.setCheckState(Qt.CheckState.Checked)
+        self.cwlayout.addWidget(self.save)
 
         self.oplayout = QHBoxLayout()
         self.oplayout.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -64,12 +93,23 @@ class MainWindow(QMainWindow):
         self.opacity = QSlider()
         self.opacity.setOrientation(Qt.Orientation.Horizontal)
         self.opacity.setRange(0,100)
-        self.opacity.setValue(70)
-        self.setToolTip(f"Inactive Opacity: {self.opacity.value()}%")
+        self.opacity.setValue(FOUND_SETTINGS.get("window_opacity") or 70)
+        self.opacity.setToolTip(f"Inactive Opacity: {self.opacity.value()}%")
         self.opacity.valueChanged.connect(self.opacityChanged)
         self.oplayout.addWidget(self.opacity)
         
         self.update(UpdateType.Map)
+    
+    def closeEvent(self, event):
+        if self.save.checkState() == Qt.CheckState.Checked:
+            print("Saving settings...")
+            FOUND_SETTINGS["window_geometry"] = self.geometry().getRect()
+            FOUND_SETTINGS["window_opacity"] = self.opacity.value()
+            FOUND_SETTINGS["window_frameless"] = self.windowFlags() & Qt.WindowType.FramelessWindowHint
+        else:
+            print("Resetting settings...")
+            FOUND_SETTINGS.clear()
+        return super().closeEvent(event)
     
     def setFrameless(self):
         self.hide()
@@ -154,4 +194,10 @@ if __name__ == "__main__":
     win = MainWindow()
     app.focusChanged.connect(win.onFocusChanged)
     win.show()
-    sys.exit(app.exec())
+    exitCode = app.exec()
+    try:
+        with open(os.path.join(CONF_DIR,"config.json"),"w") as f:
+            json.dump(FOUND_SETTINGS,f)
+    except Exception as e:
+        print(e)
+    sys.exit(exitCode)
