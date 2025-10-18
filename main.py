@@ -45,6 +45,7 @@ PylessDetective {VERSION} Help:
 NO_INTERACT = "--non-interactive" in ARGS or "-y" in ARGS
 OUTPUT_PATH = None
 SIMPLE_PRINT = "--simple-print" in ARGS or "-s" in ARGS
+PRETTIFY = "--prettify" in ARGS or "-p" in ARGS
 MODE = None
 MAP_DIR = None
 MAPS = {}
@@ -64,7 +65,7 @@ def write_output(*x:any):
     if not OUTPUT_PATH or len(x) == 0: return
     if len(x) == 1: x = x[0]
     with open(get_path(OUTPUT_PATH),"w") as f:
-        json.dump(x,f,indent=4)
+        json.dump(x,f,indent=4 if PRETTIFY else None)
 
 def output(*x:any,no_write:bool=False) -> None:
     if not OUTPUT_PATH or no_write:
@@ -136,7 +137,8 @@ def get_maps() -> list[str]:
 def gen_map_data(map:str=None):
     if not map: map = MAP
     global MAPS, CLUES
-    change_clues = False if CLUES else True
+    change_clues = True
+    CLUES.clear()
     with open(p("maps" if not MAP_DIR else MAP_DIR,f"{map}.csv")) as f:
         reader = csv.DictReader(f)
         for row in reader:
@@ -148,6 +150,11 @@ def gen_map_data(map:str=None):
             MAPS[map][row["Name"]] = data
             if change_clues: change_clues = False
     CLUES.sort()
+
+def get_map_data(map:str=None) -> dict[str:dict[str:bool]]:
+    if not map: map = MAP
+    if not MAPS[map]: gen_map_data(map)
+    return MAPS[map]
 
 def get_clues(map:str=None) -> list[str]:
     if not map: map = MAP
@@ -164,7 +171,7 @@ def get_suspects(map:str=None, evidence:list[str]=None) -> list[str]:
         person = MAPS[map][name]
         not_it = False
         for clue in evidence:
-            if not person[clue]:
+            if not person.get(clue):
                 not_it = True
                 break
         if not_it: continue
