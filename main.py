@@ -1,166 +1,165 @@
-import sys,csv,pathlib,json,os
-
+import sys, csv, pathlib, json, os
+from collections.abc import Callable
 VERSION = "v0.1"
-
-args = sys.argv
+ARGS = sys.argv
 
 DATA_PATH = "."
-
 try:
     DATA_PATH = sys._MEIPASS
 except:pass
 
-def p(x:str):
-    return os.path.join(DATA_PATH,x)
+TAB = "  "
 
-if "--help" in args or "-h" in args:
+if "--help" in ARGS or "-h" in ARGS:
     print(
 f"""
 PylessDetective {VERSION} Help:
-\tVariables:
-\t\t--help, -h | Show this message.
-\t\t--map, -m=<map_name> | Specify a map.
-\t\t--clue, -c=<clue_name> | Specify a clue. [Repeatable]
-\t\t--non-interactive, -y | Skip all input() calls.
-\t\t--output, -o=<output_path> | Specify output file path/name (JSON formatted). No output file if not specified.
-\t\t\t> eg.: `--output=result.json` => `./result.json`
-\t\t--simple-print, -s | Prints in a basic headerless CSV format.
-\t\t--mode, -f=<mode> | Program mode/function. ["suspect","clue","map"]
-\t\t\t> suspect | Finds suspects and prints/outputs them.
-\t\t\t> clue | Finds all clues of the given map and prints/outputs them.
-\t\t\t> map | Finds all map names and prints/outputs them.
-\t\t--maps-dir, -d=<map_dir> | Specify a custom map directory.
-\t\t\t> Sample directory tree:
-\t\t\t\tmaps/
-\t\t\t\t├── map1.csv
-\t\t\t\t├── map2.csv
-\t\t\t\t└── map3.csv
+{TAB}Variables:
+{TAB}{TAB}--help, -h                 | Show this message.
+{TAB}{TAB}--map, -m=<map_name>       | Specify a map.
+{TAB}{TAB}--clue, -c=<clue_name>     | Specify a clue. [Repeatable]
+{TAB}{TAB}--non-interactive, -y      | Skip asking to re-run/continue program (answers "n").
+{TAB}{TAB}--output, -o=<output_path> | Specify output file path/name (JSON formatted). No output file if not specified.
+{TAB}{TAB}{TAB}> eg.: `--output=result.json` => `./result.json`
+{TAB}{TAB}--simple-print, -s         | Prints in a basic headerless CSV format.
+{TAB}{TAB}--mode, -f=<mode>          | Program mode/function. ["suspect","clue","map"]
+{TAB}{TAB}{TAB}> suspect                | Finds suspects and outputs them.
+{TAB}{TAB}{TAB}> map                    | Finds all map names and outputs them.
+{TAB}{TAB}{TAB}> clue                   | Finds all clues of the given map and outputs them.
+{TAB}{TAB}{TAB}> map-data               | Finds data of the given map and output it. (Suspects and their respective clues.)
+{TAB}{TAB}--maps-dir, -d=<map_dir>   | Specify a custom map directory.
+{TAB}{TAB}{TAB}> Sample directory tree:
+{TAB}{TAB}{TAB}{TAB}maps/
+{TAB}{TAB}{TAB}{TAB}├── map1.csv
+{TAB}{TAB}{TAB}{TAB}├── map2.csv
+{TAB}{TAB}{TAB}{TAB}└── map3.csv
+{TAB}{TAB}--prettify, -p             | Output prettified json format.
 
-\tInformation:
-\t\t[Repeatable] | This variable can be specified multiple times.
-\t\t\t> eg.: `--clue=tooth --clue=forgotten shoe`
+{TAB}Information:
+{TAB}{TAB}[Repeatable] | This variable can be specified multiple times.
+{TAB}{TAB}{TAB}> eg.: `--clue=tooth --clue=forgotten shoe`
 """
     )
     sys.exit(0)
 
-NO_INTERACT = "--non-interactive" in args or "-y" in args
+NO_INTERACT = "--non-interactive" in ARGS or "-y" in ARGS
 OUTPUT_PATH = None
-SIMPLE_PRINT = "--simple-print" in args or "-s" in args
+SIMPLE_PRINT = "--simple-print" in ARGS or "-s" in ARGS
 MODE = None
+MAP_DIR = None
+MAPS = {}
+
+MAP = None
+CLUES = []
+EVIDENCE = []
+SUSPECTS = []
+
+def p(*x:str) -> str:
+    return os.path.join(DATA_PATH,*x)
 
 def get_path(x:str):
     return os.path.expandvars(os.path.expanduser(x))
 
-MAP_DIR = None
-for x in args:
-    if not x.startswith("--maps-dir=") and not x.startswith("-d="):
-        continue
-    MAP_DIR = x[11 if x.startswith("--maps-dir=") else 3:]
-    break
+def write_output(*x:any):
+    if not OUTPUT_PATH or len(x) == 0: return
+    if len(x) == 1: x = x[0]
+    with open(get_path(OUTPUT_PATH),"w") as f:
+        json.dump(x,f,indent=4)
 
-MAPS = {}
-for map in pathlib.Path(MAP_DIR if MAP_DIR else p("maps")).iterdir():
-    if not map.name.endswith(".csv"): continue
-    MAPS[map.name[:-4]] = {}
+def output(*x:any,no_write:bool=False) -> None:
+    if not OUTPUT_PATH or no_write:
+        return print(*x)
+    data = [v for v in x if not isinstance(v, str)]
+    write_output(*data)
 
-map = None
-clues = []
-evidence = []
-suspects = []
-
-for x in args:
-    if not map and x.startswith("--map=") or x.startswith("-m="):
-        name = x[6 if x.startswith("--map=") else 3:].lower()
-        if MAPS.get(name) != None:
-            map = name
-            continue
-    if x.startswith("--clue=") or x.startswith("-c="):
-        evidence.append(x[7 if x.startswith("--clue=") else 3:].lower())
-        continue
-    if not OUTPUT_PATH and x.startswith("--output=") or x.startswith("-o="):
-        OUTPUT_PATH = x[9 if x.startswith("--output=") else 3:]
-        continue
-    if not MODE and x.startswith("--mode=") or x.startswith("-f="):
-        MODE = x[7 if x.startswith("--mode=") else 3:].lower()
-        continue
-
-if not MODE: MODE = "suspect"
-
-if MODE == "map":
-    out_data = []
-    message = "" if SIMPLE_PRINT else "Map Names:\n"
-    for x in MAPS.keys():
-        out_data.append(x)
-        message+=f"{x}," if SIMPLE_PRINT else f"- {x}\n"
-    if SIMPLE_PRINT and message.endswith(","): message = message[:-1]
-    if not OUTPUT_PATH:
-        print(message)
+def clear_term():
+    if OUTPUT_PATH: return
+    if sys.platform == "win32":
+        os.system("cls")
     else:
-        with open(get_path(OUTPUT_PATH)"w") as f:
-            json.dump(out_data,f)
-    sys.exit(0)
+        os.system("clear")
 
-if not map:
-    name = ""
-    message = "Map Names:\n"
-    for x in MAPS.keys():
-        message+=f"- {x}\n"
-    print(message)
-    while True:
-        name = input("Enter map name: ")
-        if not name: continue
-        name = name.lower()
-        if MAPS.get(name) != None:
-            map = name
-            break
-    print()
+def safe_len(x:any,offset:int=0) -> int|None:
+    try:
+        return len(x)+offset
+    except:
+        return None
 
-firstFlag = True
-with open(p(f"maps/{map}.csv")) as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        data = {}
-        for k,v in row.items():
-            if k == "Name": continue
-            if firstFlag: clues.append(k)
-            data[k] = v=="1"
-        MAPS[map][row["Name"]] = data
-        if firstFlag: firstFlag = False
+def safe_int(x:str, offset:int=0) -> int|None:
+    try:
+        return int(x)+offset
+    except:
+        return None
 
-if MODE == "clue":
-    out_data = []
-    message = "" if SIMPLE_PRINT else "Clue Names:\n"
-    for x in clues:
-        out_data.append(x)
-        message+=f"{x}," if SIMPLE_PRINT else f"- {x}\n"
-    if SIMPLE_PRINT and message.endswith(","): message = message[:-1]
-    if not OUTPUT_PATH:
-        print(message)
-    else:
-        with open(get_path(OUTPUT_PATH)"w") as f:
-            json.dump(out_data,f)
-    sys.exit(0)
+def prettify_map_name(x:str):
+    data = x.split("-")
+    for i, v in enumerate(data):
+        data[i] = v[:1].upper()+v[1:]
+    return " ".join(data)
 
-def run(firstRun:bool=False):
-    global map,evidence,clues,suspects
-    suspects.clear()
-    if not firstRun: evidence.clear()
-    if not NO_INTERACT and (not firstRun or not evidence):
-        i = 1
-        message = "Clue Names:\n"
-        for x in clues:
-            message+=f"- {x}\n"
-        message+="\n(Leave blank and press enter to confirm)"
-        print(message)
-        while True:
-            clue = input(f"Enter evidence #{i}: ")
-            if not clue: break
-            clue = clue.lower()
-            if clue in clues:
-                i+=1
-                evidence.append(clue)
-        print()
+def uglify_map_name(x:str):
+    data = x.split(" ")
+    for i, v in enumerate(data):
+        data[i] = v.lower()
+    return "-".join(data)
 
+def format_ls_item(x:str, index:int=0, length:int=1, show_index:bool=False, index_text:str="%d.", custom_index:int=None) -> str:
+    if not custom_index: custom_index = index+1
+    if not SIMPLE_PRINT:
+        return f"{"-" if not show_index else index_text % (custom_index)} {x}\n"
+    return f"{"[" if index == 0 else ""}{x}{"," if index<length-1 else "]"}"
+
+def format_dict_item(x:str, index:int=0, length:int=1, key:str="", show_key:bool=True, key_text:str="%s:", custom_key:str=None) -> str:
+    if not custom_key: custom_key = key
+    if not SIMPLE_PRINT:
+        return f"{"" if not show_key else key_text % (custom_key)} {x}\n"
+    return f"{"{" if index == 0 else ""}{key}: {x}{"," if index<length-1 else "}"}"
+
+def str_ls(l:list,header:str=None,show_index:bool=False,index_text:str="%d.",custom_index_func:Callable[[str,int],int]=None) -> str:
+    string = f"{header}:\n" if header and not SIMPLE_PRINT else ""
+    length = len(l)
+    for i,x in enumerate(l):
+        string+=format_ls_item(x,i,length,show_index,index_text,custom_index_func(x,i) if custom_index_func else None)
+    return string
+
+def str_dict(d:dict,header:str=None,show_key:bool=True,key_text:str="%s:",custom_key_func:Callable[[str,str],str]=None) -> str:
+    string = f"{header}:\n" if header and not SIMPLE_PRINT else ""
+    length = len(d.keys())
+    for k,v in d.items():
+        string+=format_dict_item(v,list(d.keys()).index(k),length,k,show_key,key_text,custom_key_func(v,k) if custom_key_func else None)
+
+def get_maps() -> list[str]:
+    x = [x for x in MAPS.keys()]
+    x.sort()
+    return x
+
+def gen_map_data(map:str=None):
+    if not map: map = MAP
+    global MAPS, CLUES
+    change_clues = False if CLUES else True
+    with open(p("maps" if not MAP_DIR else MAP_DIR,f"{map}.csv")) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            data = {}
+            for k,v in row.items():
+                if k == "Name": continue
+                if change_clues: CLUES.append(k)
+                data[k] = v=="1"
+            MAPS[map][row["Name"]] = data
+            if change_clues: change_clues = False
+    CLUES.sort()
+
+def get_clues(map:str=None) -> list[str]:
+    if not map: map = MAP
+    if not CLUES: gen_map_data(map)
+    return CLUES
+
+def get_suspects(map:str=None, evidence:list[str]=None) -> list[str]:
+    if not map: map = MAP
+    if not evidence: evidence = EVIDENCE
+    global SUSPECTS
+    if not MAPS[map]: gen_map_data(map)
+    SUSPECTS.clear()
     for name in MAPS[map]:
         person = MAPS[map][name]
         not_it = False
@@ -169,26 +168,146 @@ def run(firstRun:bool=False):
                 not_it = True
                 break
         if not_it: continue
-        suspects.append(name)
+        SUSPECTS.append(name)
+    return SUSPECTS
 
-    out_data = []
-    if suspects:
-        message = "Potential suspects:\n"
-        keys = list(MAPS[map].keys())
-        for x in suspects:
-            message+=f"- (#{keys.index(x)+1}/{len(keys)}) {x}\n"
-            if OUTPUT_PATH:
-                out_data.append(x)
-        if not OUTPUT_PATH: print(message)
-    else:
-        if not OUTPUT_PATH: print("No suspects found; you messed up!\n")
-    if OUTPUT_PATH:
-        with open(get_path(OUTPUT_PATH)"w") as f:
-            json.dump(out_data,f)
-    if not NO_INTERACT:
-        again = input("Run again? (Y/n): ")
-        if not again or again.lower() == "y" or again.lower() == "yes":
-            run()
+def input_yn(q:str, default_value:bool=None, header:str=None) -> bool:
+    if NO_INTERACT: return False
+    default_inputs = {
+        "y": True,
+        "n": False,
+        "": default_value
+    }
+    if header:
+        output(header)
+    x = default_inputs[input(f"{q} ({"Y" if default_value else "y"}/{"n" if default_value else "N"}): ")]
+    if x == None: x = False
+    clear_term()
+    return x
+
+def input_strict(q:str, header:str=None, req_data:list[str]=[], req_func:Callable[[str,list[str]],bool]=lambda x, y : x in y, req_data_show_index:bool=False,run_forever:bool=False,run_forever_terminator:str="",starting_data:list[str]=None,starting_data_display_previous:bool=True) -> str|list[str]:
+    x = ""
+    data = starting_data or []
+    i = safe_len(starting_data,1) or 1
+    if header:
+        output(str_ls(req_data,header,req_data_show_index))
+    if run_forever:
+        output(f'Enter "{run_forever_terminator}" to confirm.' if run_forever_terminator != "" else 'Leave blank and press Enter to confirm.',no_write=True)
+    if starting_data and starting_data_display_previous:
+        string = str_ls(starting_data,show_index=True,index_text="Enter clue #%d:")
+        if string.endswith("\n"):
+            string = string[:-1]
+        output(string)
+    while True:
+        x = input(f"{q if not run_forever else q % (i)}: ")
+        if run_forever and x == run_forever_terminator: break
+        if req_func(x,req_data):
+            if not run_forever: break
+            data.append(x)
+            i+=1
+    clear_term()
+    return x if not run_forever else data
+
+def mode_map():
+    output(str_ls(get_maps(),"Maps") if not OUTPUT_PATH else get_maps())
+    sys.exit(0)
+
+def mode_clue():
+    output(str_ls(get_clues(),"Clues") if not OUTPUT_PATH else get_clues())
+    sys.exit(0)
+
+def mode_mapdata():
+    if not MAPS.get(MAP):
+        gen_map_data()
+    output(str_dict(MAPS[MAP],f"{prettify_map_name(MAP)} Map Data") if not OUTPUT_PATH else MAPS[MAP])
+    sys.exit(0)
+
+for x in ARGS:
+    if not x.startswith("--maps-dir=") and not x.startswith("-d="):
+        continue
+    MAP_DIR = x[11 if x.startswith("--maps-dir=") else 3:]
+    break
+
+for map in pathlib.Path(MAP_DIR if MAP_DIR else p("maps")).iterdir():
+    if not map.name.endswith(".csv"): continue
+    MAPS[map.name[:-4]] = {}
+
+for x in ARGS:
+    if not MAP and x.startswith("--map=") or x.startswith("-m="):
+        name = x[6 if x.startswith("--map=") else 3:].lower()
+        if MAPS.get(name) != None:
+            MAP = name
+            gen_map_data()
+            continue
+    if x.startswith("--clue=") or x.startswith("-c="):
+        EVIDENCE.append(x[7 if x.startswith("--clue=") else 3:].lower())
+        continue
+    if not OUTPUT_PATH and x.startswith("--output=") or x.startswith("-o="):
+        OUTPUT_PATH = x[9 if x.startswith("--output=") else 3:]
+        continue
+    if not MODE and x.startswith("--mode=") or x.startswith("-f="):
+        MODE = x[7 if x.startswith("--mode=") else 3:].lower()
+        continue
+if not MODE: MODE = "suspect"
+
+if MODE == "map":
+    mode_map()
+
+if MAP:
+    if MODE == "clue":
+        mode_clue()
+    if MODE == "map-data":
+        mode_mapdata()
+
+if EVIDENCE:
+    if not MAP:
+        EVIDENCE.clear()
+    if MAP:
+        if not CLUES: CLUES = get_clues()
+        evidence = []
+        for clue in EVIDENCE:
+            if clue in CLUES:
+                evidence.append(clue)
+        EVIDENCE = evidence.copy()
+        del evidence
+
+def prompt_map():
+    maps = get_maps()
+    return maps[int(input_strict("Enter map number","Maps",maps,lambda x, y: True if safe_int(x) and y[safe_int(x,-1)] else False,True))-1]
+
+def prompt_evidence():
+    return input_strict("Enter clue #%d",f"{prettify_map_name(MAP)} Clues",CLUES,run_forever=True,starting_data=EVIDENCE)
+
+def run(root_call:bool=False, clear_evidence:bool=False):
+    global MAP, CLUES, EVIDENCE, SUSPECTS
+    clear_term()
+    if not root_call:
+        if clear_evidence:
+            EVIDENCE.clear()
+        SUSPECTS.clear()
+
+    if not MAP:
+        MAP = prompt_map()
+        gen_map_data()
+
+    if MAP:
+        if MODE == "clue":
+            mode_clue()
+        if MODE == "map-data":
+            mode_mapdata()
+
+    if not root_call or not EVIDENCE:
+        EVIDENCE = prompt_evidence()
+
+    SUSPECTS = get_suspects()
+    keys = list(MAPS[MAP].keys())
+    output((str_ls(SUSPECTS,"Possible Suspects",True,f"- (#%d/{len(keys)})",lambda x, i: keys.index(x)+1) if SUSPECTS else "- No suspects found!") if not OUTPUT_PATH else SUSPECTS)
+    if len(SUSPECTS) <= 1:
+        if input_yn("Run again?",True):
+            return run(clear_evidence=True)
+        return
+    if not input_yn("Continue?",True,"Press Enter to continue."): return
+    return run()
 
 if __name__ == "__main__":
     run(True)
