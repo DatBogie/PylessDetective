@@ -7,6 +7,8 @@ Made for the Roblox game [Armless Detective](https://www.roblox.com/games/977196
 
 ## Usage
 
+Run the PylessDetectiveGui executable to use it easier.
+
 Run the program and follow the prompts to use!
 
 See flag/parameter information (useful for 3rd-party apps?):
@@ -35,22 +37,17 @@ PylessDetective -h
 2. Clone the repo:
 
     ```sh
-    git clone https://github.com/DatBogie/PylessDetective.git && cd PylessDetective
+    git clone https://github.com/DatBogie/PylessDetective.git
+    cd PylessDetective
     ```
 
-3. Setup venv:
-
-    ```sh
-    python3 -m venv .venv && source ./.venv/bin/activate && pip3 install -r requirements.txt
-    ```
-
-4. Run build script (run `build.bat` on Windows):
+3. Run build script (run `.\build.bat` on Windows):
 
     ```sh
     ./build.sh
     ```
 
-5. Binary is located in `./dist/PylessDetective` (`*.exe` on Windows, `*.app` on macOS).
+4. Binary is located in `./dist/PylessDetective` (`*.exe` on Windows, `*.app` on macOS).
 
 ## Adding Levels
 
