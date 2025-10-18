@@ -126,4 +126,3 @@ If you'd like to make map-packs (external folders containing levels), you're in 
     ```sh
     PylessDetective -d=<abs_path_to_map-pack>
     ```
-

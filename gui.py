@@ -112,7 +112,8 @@ class MainWindow(QMainWindow):
                 item.setCheckState(Qt.CheckState.Unchecked)
                 self.clues.addItem(item)
         self.suspects.clear()
-        self.suspects.addItems(get_suspects(map,self.getClues()))
+        map_data = get_map_data(map)
+        self.suspects.addItems([f"(#{list(map_data.keys()).index(x)+1}/{len(list(map_data.keys()))}) {x}" for x in get_suspects(map,self.getClues())])
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
