@@ -52,7 +52,7 @@ MAPS = {}
 
 MAP = None
 CLUES = []
-EVIDENCE = []
+EVIDENCE = {}
 SUSPECTS = []
 
 def p(*x:str) -> str:
@@ -161,17 +161,17 @@ def get_clues(map:str=None) -> list[str]:
     if not CLUES: gen_map_data(map)
     return CLUES
 
-def get_suspects(map:str=None, evidence:list[str]=None) -> list[str]:
+def get_suspects(map:str=None, evidence:dict[str:bool]=None) -> list[str]:
     if not map: map = MAP
     if not evidence: evidence = EVIDENCE
     global SUSPECTS
     if not MAPS[map]: gen_map_data(map)
     SUSPECTS.clear()
     for name in MAPS[map]:
-        person = MAPS[map][name]
+        person:dict = MAPS[map][name]
         not_it = False
-        for clue in evidence:
-            if not person.get(clue):
+        for clue, present in evidence.items():
+            if (present and not person.get(clue)) or (not present and person.get(clue)):
                 not_it = True
                 break
         if not_it: continue
@@ -182,26 +182,36 @@ def input_yn(q:str, default_value:bool=None, header:str=None) -> bool:
     if NO_INTERACT: return False
     default_inputs = {
         "y": True,
-        "n": False,
-        "": default_value
+        "n": False
     }
     if header:
         output(header)
-    x = default_inputs[input(f"{q} ({"Y" if default_value else "y"}/{"n" if default_value else "N"}): ")]
-    if x == None: x = False
+    x = default_inputs.get(input(f"{q} ({"Y" if default_value else "y"}/{"n" if default_value else "N"}): ").lower())
+    if x == None: x = default_value
     clear_term()
     return x
 
-def input_strict(q:str, header:str=None, req_data:list[str]=[], req_func:Callable[[str,list[str]],bool]=lambda x, y : x in y, req_data_show_index:bool=False,run_forever:bool=False,run_forever_terminator:str="",starting_data:list[str]=None,starting_data_display_previous:bool=True) -> str|list[str]:
+def get_value_from_str(x:str) -> bool:
+    return not x.startswith("!")
+
+def bool_dict_ls(d:dict[str:bool]):
+    l = []
+    for k, v in d.items():
+        l.append(f"{"!" if not v else ""}{k}")
+    return l
+
+def input_strict(q:str, header:str=None, req_data:list[str]=[], req_func:Callable[[str,list[str]],bool]=lambda x, y : x in y, req_data_show_index:bool=False,run_forever:bool=False,run_forever_terminator:str="",starting_data:list[str]=None,starting_data_display_previous:bool=True,data_type:type=list,data_dict_not_enabled:bool=False) -> str|list[str]:
     x = ""
-    data = starting_data or []
+    data = starting_data or ([] if data_type == list else {})
     i = safe_len(starting_data,1) or 1
     if header:
         output(str_ls(req_data,header,req_data_show_index))
+    if data_type == dict and data_dict_not_enabled:
+        output(f"Prefix with '!' to indicate NOT.\n> Eg.: '!{req_data[0]}'")
     if run_forever:
         output(f'Enter "{run_forever_terminator}" to confirm.' if run_forever_terminator != "" else 'Leave blank and press Enter to confirm.',no_write=True)
     if starting_data and starting_data_display_previous:
-        string = str_ls(starting_data,show_index=True,index_text="Enter clue #%d:")
+        string = str_ls(starting_data if type(starting_data) == list else bool_dict_ls(starting_data),show_index=True,index_text="Enter clue #%d:")
         if string.endswith("\n"):
             string = string[:-1]
         output(string)
@@ -210,7 +220,11 @@ def input_strict(q:str, header:str=None, req_data:list[str]=[], req_func:Callabl
         if run_forever and x == run_forever_terminator: break
         if req_func(x,req_data):
             if not run_forever: break
-            data.append(x)
+            if data_type == list:
+                data.append(x)
+            else:
+                present = get_value_from_str(x) if data_dict_not_enabled else True
+                data[x if present else x[1:]] = present
             i+=1
     clear_term()
     return x if not run_forever else data
@@ -247,7 +261,11 @@ for x in ARGS:
             gen_map_data()
             continue
     if x.startswith("--clue=") or x.startswith("-c="):
-        EVIDENCE.append(x[7 if x.startswith("--clue=") else 3:].lower())
+        clue = [x[7 if x.startswith("--clue=") else 3:].lower(),True]
+        if clue.startswith("!"):
+            clue[0] = clue[0][1:]
+            clue[1] = False
+        EVIDENCE[clue[0]] = clue[1]
         continue
     if not OUTPUT_PATH and x.startswith("--output=") or x.startswith("-o="):
         OUTPUT_PATH = x[9 if x.startswith("--output=") else 3:]
@@ -271,10 +289,12 @@ if EVIDENCE:
         EVIDENCE.clear()
     if MAP:
         if not CLUES: CLUES = get_clues()
-        evidence = []
-        for clue in EVIDENCE:
+        evidence = {}
+        for clue, present in EVIDENCE.items():
             if clue in CLUES:
-                evidence.append(clue)
+                if not present and clue.startswith("!"):
+                    clue = clue[1:]
+                evidence[clue] = present
         EVIDENCE = evidence.copy()
         del evidence
 
@@ -283,7 +303,7 @@ def prompt_map():
     return maps[int(input_strict("Enter map number","Maps",maps,lambda x, y: True if safe_int(x) and y[safe_int(x,-1)] else False,True))-1]
 
 def prompt_evidence():
-    return input_strict("Enter clue #%d",f"{prettify_map_name(MAP)} Clues",CLUES,run_forever=True,starting_data=EVIDENCE)
+    return input_strict("Enter clue #%d",f"{prettify_map_name(MAP)} Clues",CLUES,lambda x, y: (x in y) if not x.startswith("!") else (x[1:] in y),run_forever=True,starting_data=EVIDENCE,data_type=dict,data_dict_not_enabled=True)
 
 def run(root_call:bool=False, clear_evidence:bool=False):
     global MAP, CLUES, EVIDENCE, SUSPECTS

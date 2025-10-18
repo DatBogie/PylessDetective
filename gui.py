@@ -1,7 +1,7 @@
 import sys
 from PySide6.QtWidgets import QApplication, QMainWindow, QSlider, QCheckBox, QComboBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QSplitter, QListWidget, QAbstractItemView, QListWidgetItem
 from PySide6.QtCore import Qt, Slot
-from main import get_maps, get_clues, get_suspects, get_map_data, prettify_map_name, uglify_map_name, gen_map_data, CLUES
+from main import get_maps, get_clues, get_suspects, get_map_data, prettify_map_name, uglify_map_name, gen_map_data
 
 MAPS = get_maps()
 
@@ -44,7 +44,7 @@ class MainWindow(QMainWindow):
         self.suspects.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
         self.crlayout.addWidget(self.suspects)
 
-        self.clues = QListWidget()
+        self.clues = CheckList()
         self.clues.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.clues.itemSelectionChanged.connect(self.onCheckItemSelected)
         self.clues.itemChanged.connect(self.onCheckItemChanged)
@@ -92,6 +92,9 @@ class MainWindow(QMainWindow):
     def onCheckItemSelected(self):
         for i in range(self.clues.count()):
             item = self.clues.item(i)
+            if item.checkState() == Qt.CheckState.PartiallyChecked:
+                item.setSelected(False)
+                continue
             item.setCheckState(Qt.CheckState.Checked if item.isSelected() else Qt.CheckState.Unchecked)
         self.update()
 
@@ -102,11 +105,11 @@ class MainWindow(QMainWindow):
         self.update()
 
     def getClues(self):
-        x = []
+        x = {}
         for i in range(self.clues.count()):
             item = self.clues.item(i)
-            if not item.isSelected(): continue
-            x.append(uglify_map_name(item.text()))
+            if item.checkState() == Qt.CheckState.Unchecked: continue
+            x[uglify_map_name(item.text())] = item.checkState() == Qt.CheckState.Checked
         return x
 
     def update(self, mode:UpdateType=UpdateType.Clue):
@@ -117,13 +120,34 @@ class MainWindow(QMainWindow):
             self.clues.clear()
             for x in get_clues(map):
                 x = prettify_map_name(x)
-                item = QListWidgetItem(x)
-                item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
-                item.setCheckState(Qt.CheckState.Unchecked)
+                item = CheckListItem(x)
                 self.clues.addItem(item)
         self.suspects.clear()
         map_data = get_map_data(map)
         self.suspects.addItems([f"(#{list(map_data.keys()).index(x)+1}/{len(list(map_data.keys()))}) {x}" for x in get_suspects(map,self.getClues())])
+
+class CheckList(QListWidget):
+    def __init__(self):
+        super().__init__()
+    def contextMenuEvent(self, event):
+        item = self.itemAt(event.pos())
+        if item:
+            item.setSelected(False)
+            if item.checkState() != Qt.CheckState.PartiallyChecked:
+                item.setCheckState(Qt.CheckState.PartiallyChecked)
+            else:
+                item.setCheckState(Qt.CheckState.Unchecked)
+        else:
+            for i in range(self.count()):
+                item = self.item(i)
+                item.setCheckState(Qt.CheckState.Unchecked)
+        return super().contextMenuEvent(event)
+
+class CheckListItem(QListWidgetItem):
+    def __init__(self,text):
+        super().__init__(text)
+        self.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+        self.setCheckState(Qt.CheckState.Unchecked)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
