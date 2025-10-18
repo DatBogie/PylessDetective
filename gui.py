@@ -1,5 +1,5 @@
 import sys
-from PySide6.QtWidgets import QApplication, QMainWindow, QSlider, QComboBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QSplitter, QListWidget, QAbstractItemView, QListWidgetItem
+from PySide6.QtWidgets import QApplication, QMainWindow, QSlider, QCheckBox, QComboBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QSplitter, QListWidget, QAbstractItemView, QListWidgetItem
 from PySide6.QtCore import Qt, Slot
 from main import get_maps, get_clues, get_suspects, get_map_data, prettify_map_name, uglify_map_name, gen_map_data, CLUES
 
@@ -50,6 +50,11 @@ class MainWindow(QMainWindow):
         self.clues.itemChanged.connect(self.onCheckItemChanged)
         self.cwlayout.addWidget(self.clues)
 
+        self.deco = QCheckBox("Frameless Window")
+        self.deco.setCheckState(Qt.CheckState.Unchecked)
+        self.deco.checkStateChanged.connect(self.setFrameless)
+        self.cwlayout.addWidget(self.deco)
+
         self.oplayout = QHBoxLayout()
         self.oplayout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.cwlayout.addLayout(self.oplayout)
@@ -66,6 +71,11 @@ class MainWindow(QMainWindow):
         
         self.update(UpdateType.Map)
     
+    def setFrameless(self):
+        self.hide()
+        self.setWindowFlag(Qt.WindowType.FramelessWindowHint,self.deco.checkState() == Qt.CheckState.Checked)
+        self.show()
+
     def opacityChanged(self):
         self.opacity.setToolTip(f"Inactive Opacity: {self.opacity.value()}%")
 
