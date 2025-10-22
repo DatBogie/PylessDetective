@@ -27,9 +27,27 @@ PylessDetective -h
 
 ## Installation
 
-### Windows/Linux/macOS
+### Windows/Linux, macOS Headless Binary (`.elf`)
 
 1. Download the binary from the [latest release](https://github.com/DatBogie/PylessDetective/releases/latest).
+
+### macOS GUI Binary (`.zip` -> `.app`)
+
+1. Download the binary from the [latest release](https://github.com/DatBogie/PylessDetective/releases/latest).
+2. In Finder, double-click/run with Archive Utility `PylessDetectiveGui.zip`. `PylessDetectiveGui.app` will now appear.
+3. Double-click/run `PylessDetectiveGui.app`. A popup will appear cautioning that the developer is unverified. Dismiss this popup.
+
+***If the prompt doesn't show, you do not need to follow these steps futher!***
+
+4. Go to the "Privacy & Security" tab in System Settings, then scroll down and find the box saying "'PylessDetectiveGui.app' was blocked from use because it is not from an identified developer."
+
+    <details>
+        <summary><b><i>Show image of the afformentioned box</summary></i></b>
+        <img src="./repo-assets/macOSAllowExecution.png" width="800px">
+    </details>
+
+5. At the bottom of said box, click the "Open Anyway" button. A new popup will appear warning again that the developer is unverified. Click "Open."
+6. Back in Finder, double-click/run `PylessDetectiveGui.app` again, and voila!
 
 ### Any OS
 
@@ -126,4 +144,5 @@ If you'd like to make map-packs (external folders containing levels), you're in 
     ```sh
     PylessDetective -d=<abs_path_to_map-pack>
     ```
+
 
