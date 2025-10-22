@@ -27,7 +27,7 @@ PylessDetective -h
 
 ## Installation
 
-### Windows/Linux
+### Windows/Linux/macOS
 
 1. Download the binary from the [latest release](https://github.com/DatBogie/PylessDetective/releases/latest).
 
@@ -126,3 +126,4 @@ If you'd like to make map-packs (external folders containing levels), you're in 
     ```sh
     PylessDetective -d=<abs_path_to_map-pack>
     ```
+
