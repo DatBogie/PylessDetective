@@ -1,7 +1,32 @@
-import os, sys, json
-from PySide6.QtWidgets import QApplication, QMainWindow, QSlider, QCheckBox, QComboBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QSplitter, QListWidget, QAbstractItemView, QListWidgetItem
-from PySide6.QtCore import Qt, Slot, QStandardPaths
-from main import get_maps, get_clues, get_suspects, get_map_data, prettify_map_name, uglify_map_name, gen_map_data, TAB
+import os, sys, json, webbrowser, requests
+from lastversion import lastversion
+from PySide6.QtWidgets import QApplication, QMainWindow, QSlider, QCheckBox, QComboBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QSplitter, QListWidget, QAbstractItemView, QListWidgetItem, QMessageBox, QErrorMessage, QPushButton
+from PySide6.QtCore import Qt, Slot, QStandardPaths, QSize
+from PySide6.QtGui import QResizeEvent
+from main import get_maps, get_clues, get_suspects, get_map_data, prettify_map_name, uglify_map_name, gen_map_data, TAB, DATA_PATH, p
+
+def get__file__():
+    if getattr(sys, 'frozen', False):
+        return sys.executable
+    else:
+        return __file__
+
+def cleanup_old_bin():
+    if os.path.exists(os.path.join(os.path.dirname(get__file__()),os.path.basename(get__file__())+".old")):
+        os.remove(os.path.join(os.path.dirname(get__file__()),os.path.basename(get__file__())+".old"))
+
+cleanup_old_bin()
+
+VERSION_TAG = "0.4"
+BINARY_EXT = {
+    "win32": ".exe",
+    "linux": "",
+    "darwin": ".zip"
+}
+def get_download_url(tag:str) -> str:
+    bname = "PylessDetectiveGui"+(BINARY_EXT.get(sys.platform) or "")
+    if not bname: return None
+    return f"https://github.com/DatBogie/PylessDetective/releases/download/v{tag}/{bname}"
 
 MAPS = get_maps()
 
@@ -34,6 +59,37 @@ class MainWindow(QMainWindow):
         if FOUND_SETTINGS.get("window_geometry"):
             print(CONF_DIR)
             self.setGeometry(*FOUND_SETTINGS["window_geometry"])
+
+        # Updater
+        if FOUND_SETTINGS.get("updater_enabled") != False:
+            print("Checking for updates...")
+            new_version = lastversion.has_update("DatBogie/PylessDetective",VERSION_TAG)
+            if new_version:
+                update_msg = QMessageBox(QMessageBox.Icon.Information,"Updater - PylessDetective",f"A new version of PylessDetective is available!\nCurrent: {VERSION_TAG}\nLatest: {new_version}",parent=self)
+                update_msg.addButton("Update",QMessageBox.ButtonRole.AcceptRole)
+                update_msg.setStandardButtons(QMessageBox.StandardButton.Ignore)
+                if update_msg.exec() == 2:
+                    dl_url = get_download_url(new_version)
+                    if dl_url is None:
+                        if QMessageBox.critical(self,"Updater - PylessDetective","Pre-built binaries are not available for your platform on this version.\nPlease visit the GitHub page to learn how to build them yourself!",QMessageBox.StandardButton.Open|QMessageBox.StandardButton.Abort) == QMessageBox.StandardButton.Open:
+                            webbrowser.open("https://github.com/DatBogie/PylessDetective")
+                    else:
+                        try:
+                            response = requests.get(dl_url,stream=True)
+                            response.raise_for_status()
+                            output_path = os.path.join(os.path.dirname(get__file__()),f"PylessDetectiveGui{BINARY_EXT[sys.platform]}")
+                            cleanup_old_bin()
+                            os.rename(get__file__(),os.path.basename(get__file__())+".old")
+                            with open(output_path,"wb") as f:
+                                for chunk in response.iter_content(chunk_size=8192):
+                                    f.write(chunk)
+                            if sys.platform != "darwin":
+                                QMessageBox.information(self,"Updater - PylessDetective","Download complete! PylessDetective will now close.",QMessageBox.StandardButton.Close)
+                                sys.exit(0)
+                            else:
+                                QMessageBox.information(self,"Updater - PylessDetective",f"Download complete! Please extract the downloaded zip ({output_path}) and replace the existing application.",QMessageBox.StandardButton.Ok)
+                        except Exception as e:
+                            QErrorMessage(self).showMessage(str(e))
 
         self.cwidget = QSplitter(Qt.Orientation.Horizontal)
         self.cwidget.setHandleWidth(8)
@@ -73,16 +129,33 @@ class MainWindow(QMainWindow):
         self.clues.itemChanged.connect(self.onCheckItemChanged)
         self.cwlayout.addWidget(self.clues)
 
+        self.decolay = QHBoxLayout()
+
         self.deco = QCheckBox("Frameless Window")
         self.deco.setToolTip("Toggle hiding window title/borders")
-        self.deco.setCheckState(Qt.CheckState.Unchecked)
+        self.deco.setCheckState(Qt.CheckState.Checked if FOUND_SETTINGS.get("window_frameless") else Qt.CheckState.Unchecked)
         self.deco.checkStateChanged.connect(self.setFrameless)
-        self.cwlayout.addWidget(self.deco)
+        self.decolay.addWidget(self.deco)
+
+        close = QPushButton("Close")
+        close.clicked.connect(self.close)
+        self.decolay.addWidget(close)
+
+        self.cwlayout.addLayout(self.decolay)
         
-        self.save = QCheckBox("Save Window Info")
-        self.save.setToolTip("Save window position, opacity, and titlebar/border visibility\nWhen closed while toggle off, settings will be wiped")
-        self.save.setCheckState(Qt.CheckState.Checked)
-        self.cwlayout.addWidget(self.save)
+        self.savelay = QHBoxLayout()
+
+        self.save = QCheckBox("Save Window Data")
+        self.save.setToolTip("Save window size/position\nWhen closed while toggled off, saved window position will be wiped")
+        self.save.setCheckState(Qt.CheckState.Checked if FOUND_SETTINGS.get("window_geometry") != False else Qt.CheckState.Unchecked)
+        self.savelay.addWidget(self.save)
+
+        self.updater = QCheckBox("Run Updater on Launch")
+        self.updater.setToolTip("Check for PylessDetective updates from GitHub on launch")
+        self.updater.setCheckState(Qt.CheckState.Checked if FOUND_SETTINGS.get("updater_enabled") != False else Qt.CheckState.Unchecked)
+        self.savelay.addWidget(self.updater)
+
+        self.cwlayout.addLayout(self.savelay)
 
         self.oplayout = QHBoxLayout()
         self.oplayout.setAlignment(Qt.AlignmentFlag.AlignLeft)
@@ -101,14 +174,15 @@ class MainWindow(QMainWindow):
         self.update(UpdateType.Map)
     
     def closeEvent(self, event):
+        print("Saving settings...")
+        FOUND_SETTINGS["window_opacity"] = self.opacity.value()
+        FOUND_SETTINGS["window_frameless"] = self.windowFlags() & Qt.WindowType.FramelessWindowHint
+        FOUND_SETTINGS["updater_enabled"] = self.updater.checkState() == Qt.CheckState.Checked
         if self.save.checkState() == Qt.CheckState.Checked:
-            print("Saving settings...")
             FOUND_SETTINGS["window_geometry"] = self.geometry().getRect()
-            FOUND_SETTINGS["window_opacity"] = self.opacity.value()
-            FOUND_SETTINGS["window_frameless"] = self.windowFlags() & Qt.WindowType.FramelessWindowHint
         else:
-            print("Resetting settings...")
-            FOUND_SETTINGS.clear()
+            print("Resetting geometry...")
+            FOUND_SETTINGS.pop("window_geometry")
         return super().closeEvent(event)
     
     def setFrameless(self):
