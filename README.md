@@ -114,7 +114,7 @@ If you'd like to make map-packs (external folders containing levels), you're in 
     Name,
     ```
 
-5. After the comma, type a shorted name of each clue, separated by commas. Eg.:
+5. After the comma, type a shorted **<u>(lowercase)</u>** name of each clue, separated by commas. Eg.:
 
     ```csv
     Name,clue1,clue2,clue3
@@ -144,5 +144,3 @@ If you'd like to make map-packs (external folders containing levels), you're in 
     ```sh
     PylessDetective -d=<abs_path_to_map-pack>
     ```
-
-

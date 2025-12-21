@@ -162,9 +162,9 @@ def get_clues(map:str=None) -> list[str]:
     return CLUES
 
 def get_suspects(map:str=None, evidence:dict[str:bool]=None) -> list[str]:
+    global SUSPECTS
     if not map: map = MAP
     if not evidence: evidence = EVIDENCE
-    global SUSPECTS
     if not MAPS[map]: gen_map_data(map)
     SUSPECTS.clear()
     for name in MAPS[map]:
@@ -249,9 +249,15 @@ for x in ARGS:
     MAP_DIR = x[11 if x.startswith("--maps-dir=") else 3:]
     break
 
-for map in pathlib.Path(MAP_DIR if MAP_DIR else p("maps")).iterdir():
-    if not map.name.endswith(".csv"): continue
-    MAPS[map.name[:-4]] = {}
+def gen_map_dict():
+    global MAPS
+    MAPS.clear()
+    for map in pathlib.Path(MAP_DIR if MAP_DIR else p("maps")).iterdir():
+        print(map.name)
+        if not map.name.endswith(".csv"): continue
+        MAPS[map.name[:-4]] = {}
+
+gen_map_dict()
 
 for x in ARGS:
     if not MAP and x.startswith("--map=") or x.startswith("-m="):

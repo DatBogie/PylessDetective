@@ -1,9 +1,10 @@
 import os, sys, json, webbrowser, requests
+from enum import Enum, auto
 from lastversion import lastversion
-from PySide6.QtWidgets import QApplication, QMainWindow, QSlider, QCheckBox, QComboBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QSplitter, QListWidget, QAbstractItemView, QListWidgetItem, QMessageBox, QErrorMessage, QPushButton
-from PySide6.QtCore import Qt, Slot, QStandardPaths, QSize
-from PySide6.QtGui import QResizeEvent
-from main import get_maps, get_clues, get_suspects, get_map_data, prettify_map_name, uglify_map_name, gen_map_data, TAB, DATA_PATH, p
+from PySide6.QtWidgets import QApplication, QMainWindow, QSlider, QCheckBox, QComboBox, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QSplitter, QListWidget, QAbstractItemView, QListWidgetItem, QMessageBox, QErrorMessage, QPushButton, QMenuBar, QFileDialog
+from PySide6.QtCore import Qt, Slot, QStandardPaths
+from pathlib import Path
+import main as LOGIC
 
 def get__file__():
     if getattr(sys, 'frozen', False):
@@ -28,7 +29,7 @@ def get_download_url(tag:str) -> str:
     if not bname: return None
     return f"https://github.com/DatBogie/PylessDetective/releases/download/v{tag}/{bname}"
 
-MAPS = get_maps()
+MAPS = LOGIC.get_maps()
 
 class UpdateType: Map=0; Clue=1
 
@@ -46,6 +47,11 @@ try:
 except Exception as e:
     print(e)
 
+class UpdateResult(Enum):
+    UpdateFail = -1
+    NoUpdate = auto()
+    UpdateSuccess = auto()
+
 class MainWindow(QMainWindow):
     global FOUND_SETTINGS
     def __init__(self):
@@ -62,34 +68,20 @@ class MainWindow(QMainWindow):
 
         # Updater
         if FOUND_SETTINGS.get("updater_enabled") != False:
-            print("Checking for updates...")
-            new_version = lastversion.has_update("DatBogie/PylessDetective",VERSION_TAG)
-            if new_version:
-                update_msg = QMessageBox(QMessageBox.Icon.Information,"Updater - PylessDetective",f"A new version of PylessDetective is available!\nCurrent: {VERSION_TAG}\nLatest: {new_version}",parent=self)
-                update_msg.addButton("Update",QMessageBox.ButtonRole.AcceptRole)
-                update_msg.setStandardButtons(QMessageBox.StandardButton.Ignore)
-                if update_msg.exec() == 2:
-                    dl_url = get_download_url(new_version)
-                    if dl_url is None:
-                        if QMessageBox.critical(self,"Updater - PylessDetective","Pre-built binaries are not available for your platform on this version.\nPlease visit the GitHub page to learn how to build them yourself!",QMessageBox.StandardButton.Open|QMessageBox.StandardButton.Abort) == QMessageBox.StandardButton.Open:
-                            webbrowser.open("https://github.com/DatBogie/PylessDetective")
-                    else:
-                        try:
-                            response = requests.get(dl_url,stream=True)
-                            response.raise_for_status()
-                            output_path = os.path.join(os.path.dirname(get__file__()),f"PylessDetectiveGui{BINARY_EXT[sys.platform]}")
-                            cleanup_old_bin()
-                            os.rename(get__file__(),os.path.basename(get__file__())+".old")
-                            with open(output_path,"wb") as f:
-                                for chunk in response.iter_content(chunk_size=8192):
-                                    f.write(chunk)
-                            if sys.platform != "darwin":
-                                QMessageBox.information(self,"Updater - PylessDetective","Download complete! PylessDetective will now close.",QMessageBox.StandardButton.Close)
-                                sys.exit(0)
-                            else:
-                                QMessageBox.information(self,"Updater - PylessDetective",f"Download complete! Please extract the downloaded zip ({output_path}) and replace the existing application.",QMessageBox.StandardButton.Ok)
-                        except Exception as e:
-                            QErrorMessage(self).showMessage(str(e))
+            self.check_upd(True)
+
+        menubar = QMenuBar()
+        fmenu = menubar.addMenu("File")
+        fmenu.addAction("Load Map Directory...",self.loadMapDir)
+        fmenu.addAction("Reset Map Directory",self.resetMapDir)
+        fmenu.addAction("Exit",self.close)
+        emenu = menubar.addMenu("Edit")
+        emenu.addAction("Clear Selected Clues",lambda: [self.clues.item(i).setCheckState(Qt.CheckState.Unchecked) for i in range(self.clues.count())])
+        emenu.addAction("Open Preferences...")
+        hmenu = menubar.addMenu("Help")
+        hmenu.addAction("Check for Updates...",self.check_upd)
+        hmenu.addAction("Open GitHub Repo...",lambda: webbrowser.open("https://github.com/DatBogie/PylessDetective"))
+        self.setMenuBar(menubar)
 
         self.cwidget = QSplitter(Qt.Orientation.Horizontal)
         self.cwidget.setHandleWidth(8)
@@ -113,7 +105,7 @@ class MainWindow(QMainWindow):
 
         self.toplayout.addWidget(QLabel("Map:"))
         self.mapSwitcher = QComboBox(self.cwidget)
-        self.mapSwitcher.addItems([prettify_map_name(x) for x in MAPS])
+        self.mapSwitcher.addItems([LOGIC.prettify_map_name(x) for x in MAPS])
         self.mapSwitcher.currentTextChanged.connect(lambda: self.update(UpdateType.Map))
         self.toplayout.addWidget(self.mapSwitcher)
 
@@ -123,7 +115,7 @@ class MainWindow(QMainWindow):
         self.crlayout.addWidget(self.suspects)
 
         self.clues = CheckList()
-        self.clues.setToolTip(f"Clue:\n{TAB}Left Click: Toggle mark as found/to-be-found\n{TAB}Right Click: Toggle mark as not present\nBackground:\n{TAB}Right Click: Clear selection")
+        self.clues.setToolTip(f"Clue:\n{LOGIC.TAB}Left Click: Toggle mark as found/to-be-found\n{LOGIC.TAB}Right Click: Toggle mark as not present\nBackground:\n{LOGIC.TAB}Right Click: Clear selection")
         self.clues.setSelectionMode(QAbstractItemView.SelectionMode.MultiSelection)
         self.clues.itemSelectionChanged.connect(self.onCheckItemSelected)
         self.clues.itemChanged.connect(self.onCheckItemChanged)
@@ -170,8 +162,48 @@ class MainWindow(QMainWindow):
         self.opacity.setToolTip(f"Inactive Opacity: {self.opacity.value()}%")
         self.opacity.valueChanged.connect(self.opacityChanged)
         self.oplayout.addWidget(self.opacity)
-        
+
         self.update(UpdateType.Map)
+    
+    def check_upd(self,silent_fail:bool=False):
+        print("Checking for updates...")
+        result = None
+        new_version = lastversion.has_update("DatBogie/PylessDetective",VERSION_TAG)
+        if new_version:
+            update_msg = QMessageBox(QMessageBox.Icon.Information,"Updater - PylessDetective",f"A new version of PylessDetective is available!\nCurrent: {VERSION_TAG}\nLatest: {new_version}",parent=self)
+            update_msg.addButton("Update",QMessageBox.ButtonRole.AcceptRole)
+            update_msg.setStandardButtons(QMessageBox.StandardButton.Ignore)
+            if update_msg.exec() == 2:
+                dl_url = get_download_url(new_version)
+                if dl_url is None:
+                    if QMessageBox.critical(self,"Updater - PylessDetective","Pre-built binaries are not available for your platform on this version.\nPlease visit the GitHub page to learn how to build them yourself!",QMessageBox.StandardButton.Open|QMessageBox.StandardButton.Abort) == QMessageBox.StandardButton.Open:
+                        webbrowser.open("https://github.com/DatBogie/PylessDetective")
+                else:
+                    try:
+                        response = requests.get(dl_url,stream=True)
+                        response.raise_for_status()
+                        output_path = os.path.join(os.path.dirname(get__file__()),f"PylessDetectiveGui{BINARY_EXT[sys.platform]}")
+                        cleanup_old_bin()
+                        os.rename(get__file__(),os.path.basename(get__file__())+".old")
+                        with open(output_path,"wb") as f:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                f.write(chunk)
+                        if sys.platform != "darwin":
+                            QMessageBox.information(self,"Updater - PylessDetective","Download complete! PylessDetective will now close.",QMessageBox.StandardButton.Close)
+                            result = UpdateResult.UpdateSuccess
+                        else:
+                            QMessageBox.information(self,"Updater - PylessDetective",f"Download complete! Please extract the downloaded zip ({output_path}) and replace the existing application.",QMessageBox.StandardButton.Ok)
+                            result = UpdateResult.UpdateSuccess
+                    except Exception as e:
+                        QErrorMessage(self).showMessage(str(e))
+        else:
+            result = UpdateResult.NoUpdate
+        
+        if result == UpdateResult.UpdateSuccess and sys.platform != "darwin":
+            self.close()
+        
+        if not silent_fail and result == UpdateResult.NoUpdate:
+            QMessageBox.information(self,"Updater - PylessDetective","You are already running the latest version of PylessDetective!",QMessageBox.StandardButton.Ok)
     
     def closeEvent(self, event):
         print("Saving settings...")
@@ -223,22 +255,36 @@ class MainWindow(QMainWindow):
         for i in range(self.clues.count()):
             item = self.clues.item(i)
             if item.checkState() == Qt.CheckState.Unchecked: continue
-            x[uglify_map_name(item.text())] = item.checkState() == Qt.CheckState.Checked
+            x[LOGIC.uglify_map_name(item.text())] = item.checkState() == Qt.CheckState.Checked
         return x
 
     def update(self, mode:UpdateType=UpdateType.Clue):
         map = self.getMAP()
 
         if mode < 1:
-            gen_map_data(map)
+            LOGIC.gen_map_data(map)
             self.clues.clear()
-            for x in get_clues(map):
-                x = prettify_map_name(x)
+            for x in LOGIC.get_clues(map):
+                x = LOGIC.prettify_map_name(x)
                 item = CheckListItem(x)
                 self.clues.addItem(item)
         self.suspects.clear()
-        map_data = get_map_data(map)
-        self.suspects.addItems([f"(#{list(map_data.keys()).index(x)+1}/{len(list(map_data.keys()))}) {x}" for x in get_suspects(map,self.getClues())])
+        map_data = LOGIC.get_map_data(map)
+        self.suspects.addItems([f"(#{list(map_data.keys()).index(x)+1}/{len(list(map_data.keys()))}) {x}" for x in LOGIC.get_suspects(map,self.getClues())])
+    
+    def loadMapDir(self,dir=False):
+        global MAPS
+        LOGIC.MAP_DIR = dir if dir != False else Path(QFileDialog.getExistingDirectory(self,"Choose Map Directory",QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation)))
+        LOGIC.gen_map_dict()
+        MAPS = LOGIC.get_maps()
+        print(MAPS)
+        self.mapSwitcher.clear()
+        self.mapSwitcher.addItems([LOGIC.prettify_map_name(x) for x in MAPS])
+        self.mapSwitcher.setCurrentIndex(0)
+        self.update(UpdateType.Map)
+
+    def resetMapDir(self):
+        self.loadMapDir(None)
 
 class CheckList(QListWidget):
     def __init__(self):
