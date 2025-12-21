@@ -253,7 +253,6 @@ def gen_map_dict():
     global MAPS
     MAPS.clear()
     for map in pathlib.Path(MAP_DIR if MAP_DIR else p("maps")).iterdir():
-        print(map.name)
         if not map.name.endswith(".csv"): continue
         MAPS[map.name[:-4]] = {}
 

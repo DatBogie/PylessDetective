@@ -77,11 +77,19 @@ class MainWindow(QMainWindow):
         fmenu.addAction("Exit",self.close)
         emenu = menubar.addMenu("Edit")
         emenu.addAction("Clear Selected Clues",lambda: [self.clues.item(i).setCheckState(Qt.CheckState.Unchecked) for i in range(self.clues.count())])
-        emenu.addAction("Open Preferences...")
+        # emenu.addAction("Open Preferences...",self.showPrefWin)
         hmenu = menubar.addMenu("Help")
         hmenu.addAction("Check for Updates...",self.check_upd)
         hmenu.addAction("Open GitHub Repo...",lambda: webbrowser.open("https://github.com/DatBogie/PylessDetective"))
         self.setMenuBar(menubar)
+
+        self.prefwin = QWidget()
+        self.prefwin.setWindowTitle("Preferences - PylessDetective")
+        self.prefwin.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint)
+        self.prefwin.setGeometry(self.geometry())
+
+        self.prefwinlay = QVBoxLayout()
+        self.prefwin.setLayout(self.prefwinlay)
 
         self.cwidget = QSplitter(Qt.Orientation.Horizontal)
         self.cwidget.setHandleWidth(8)
@@ -164,6 +172,14 @@ class MainWindow(QMainWindow):
         self.oplayout.addWidget(self.opacity)
 
         self.update(UpdateType.Map)
+    
+    def showPrefWin(self):
+        geo = self.geometry()
+        width = geo.width()//2
+        height = geo.height()//2
+        self.prefwin.setGeometry(geo.x() + width//2,geo.y() + height//2,width,height)
+        self.prefwin.show()
+        self.prefwin.raise_()
     
     def check_upd(self,silent_fail:bool=False):
         print("Checking for updates...")
@@ -277,7 +293,6 @@ class MainWindow(QMainWindow):
         LOGIC.MAP_DIR = dir if dir != False else Path(QFileDialog.getExistingDirectory(self,"Choose Map Directory",QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DownloadLocation)))
         LOGIC.gen_map_dict()
         MAPS = LOGIC.get_maps()
-        print(MAPS)
         self.mapSwitcher.clear()
         self.mapSwitcher.addItems([LOGIC.prettify_map_name(x) for x in MAPS])
         self.mapSwitcher.setCurrentIndex(0)
